@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f7fb">
+  <title>Chat nội bộ</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Chat nội bộ - trang chủ">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="brand-copy"><small>WORKSPACE</small><strong>Chat nội bộ</strong></span>
+      </a>
+      <div class="topbar-right">
+        <span class="connection-pill">Ứng dụng nội bộ</span>
+        <span id="profileInitial" class="profile-avatar" aria-label="Tài khoản">D</span>
+      </div>
+    </header>
+
+    <section id="auth" class="auth-layout">
+      <div class="auth-intro">
+        <span class="eyebrow">KẾT NỐI ĐỘI NGŨ</span>
+        <h1>Trao đổi công việc,<br><em>liền mạch hơn.</em></h1>
+        <p>Một không gian riêng để nhóm của bạn chia sẻ thông tin, phối hợp và lưu lại các cuộc trò chuyện.</p>
+        <div class="intro-points">
+          <div><span class="point-icon">↗</span><span><strong>Trò chuyện tức thời</strong><small>Tin nhắn được gửi trực tiếp tới thành viên trong phòng.</small></span></div>
+          <div><span class="point-icon">⌂</span><span><strong>Không gian theo nhóm</strong><small>Tạo phòng riêng cho từng công việc hoặc bộ phận.</small></span></div>
+        </div>
+      </div>
+      <div class="auth-card">
+        <span class="eyebrow">CHÀO MỪNG BẠN</span>
+        <h2>Đăng nhập</h2>
+        <p class="card-subtitle">Nhập thông tin tài khoản để tiếp tục.</p>
+        <form id="authForm">
+          <label for="username">Tên người dùng</label>
+          <input id="username" name="username" placeholder="Ví dụ: duy-khanh" autocomplete="username" required minlength="3">
+          <label for="password">Mật khẩu</label>
+          <input id="password" name="password" type="password" placeholder="Ít nhất 10 ký tự" autocomplete="current-password" required minlength="10">
+          <button class="primary-button" type="submit">Đăng nhập <span aria-hidden="true">→</span></button>
+          <button type="button" id="register" class="text-button">Chưa có tài khoản? <strong>Tạo tài khoản</strong></button>
+        </form>
+        <p id="authError" class="error-message" role="alert"></p>
+        <div class="auth-footnote"><span>🔒</span> Phiên làm việc được bảo vệ bằng xác thực tài khoản</div>
+      </div>
+    </section>
+
+    <section id="chat" class="workspace" hidden>
+      <aside class="sidebar">
+        <div class="sidebar-heading">
+          <span class="eyebrow">WORKSPACE</span>
+          <h2>Phòng trò chuyện <span class="heading-spark">✦</span></h2>
+          <p>Chọn một phòng để bắt đầu trao đổi.</p>
+        </div>
+        <div class="sidebar-tools">
+          <form id="roomForm" class="create-room-form">
+            <label for="roomName">Tạo phòng mới</label>
+            <div class="input-with-button"><input id="roomName" name="name" placeholder="Tên phòng" required><button aria-label="Tạo phòng" title="Tạo phòng">+</button></div>
+          </form>
+          <form id="joinForm" class="join-room-form">
+            <label for="joinId">Tham gia phòng</label>
+            <div class="input-with-button"><input id="joinId" placeholder="Nhập ID phòng"><button id="joinRoom" type="button" aria-label="Tham gia phòng" title="Tham gia phòng">↗</button></div>
+          </form>
+        </div>
+        <div class="room-list-heading"><span>GẦN ĐÂY</span><span id="roomCount" class="count-badge">0</span></div>
+        <ul id="rooms" class="room-list"></ul>
+        <div class="sidebar-spacer"></div>
+        <div class="account-card">
+          <span class="account-avatar">D</span>
+          <span class="account-copy"><strong id="accountName">Tài khoản của bạn</strong><small><i></i> Đang hoạt động</small></span>
+          <button id="logout" class="logout-button" title="Đăng xuất" aria-label="Đăng xuất" hidden>↪</button>
+        </div>
+      </aside>
+
+      <article class="conversation-panel">
+        <header class="conversation-header">
+          <div class="conversation-title-wrap">
+            <span class="room-mark" aria-hidden="true">#</span>
+            <div><span class="eyebrow">CUỘC TRÒ CHUYỆN</span><h2 id="roomTitle">Chọn phòng</h2><p id="roomSubtitle">Tin nhắn và trao đổi của nhóm sẽ hiển thị tại đây.</p></div>
+          </div>
+          <span class="live-label disconnected" id="liveStatus"><i></i><span id="liveStatusText">Đang kết nối</span></span>
+        </header>
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="empty-state"><span class="empty-icon" aria-hidden="true">✉</span><h3>Cuộc trò chuyện bắt đầu từ đây</h3><p>Chọn một phòng ở bên trái hoặc tạo phòng mới để gửi tin nhắn đầu tiên.</p></div>
+        </div>
+        <form id="messageForm" class="composer" hidden>
+          <input name="body" placeholder="Viết tin nhắn..." maxlength="2000" aria-label="Nội dung tin nhắn" required>
+          <span class="composer-hint">Enter để gửi</span>
+          <button class="send-button" aria-label="Gửi tin nhắn">Gửi <span aria-hidden="true">↑</span></button>
+        </form>
+        <div id="notice" class="notice" role="status"></div>
+      </article>
+    </section>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
