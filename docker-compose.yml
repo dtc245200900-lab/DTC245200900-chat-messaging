@@ -1,0 +1,104 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U chat_app -d internal_chat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: "false"
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [backend, edge]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  nginx:
+    image: nginx:1.27-alpine
+    ports: ["80:80"]
+    volumes: [./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro]
+    depends_on: [app]
+    networks: [edge, observability]
+  pgadmin:
+    image: dpage/pgadmin4:8
+    ports: ["127.0.0.1:5050:80"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    volumes: [pgadmin_data:/var/lib/pgadmin]
+    networks: [backend, edge]
+    profiles: [admin]
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes: [./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro, prometheus_data:/prometheus]
+    networks: [backend, observability]
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    environment:
+      DATA_SOURCE_URI: db:5432/${POSTGRES_DB}?sslmode=disable
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [backend, observability]
+    restart: unless-stopped
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.60.6
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    networks: [observability]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks: [observability, edge]
+  loki:
+    image: grafana/loki:3.3.2
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes: [./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro, loki_data:/loki]
+    networks: [observability]
+  promtail:
+    image: grafana/promtail:3.3.2
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes: [./loki/promtail-config.yml:/etc/promtail/config.yml:ro, /var/run/docker.sock:/var/run/docker.sock:ro]
+    networks: [observability]
+    depends_on: [loki]
+networks:
+  backend: {internal: true}
+  edge: {}
+  observability: {internal: true}
+volumes:
+  postgres_data:
+  pgadmin_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
