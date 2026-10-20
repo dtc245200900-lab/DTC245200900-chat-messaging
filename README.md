@@ -180,3 +180,57 @@ src/                Node.js app và giao diện web
 docker-compose.yml  Dịch vụ, network và volumes
 Dockerfile          Image ứng dụng
 ```
+
+## 12. Đối chiếu tiêu chí đánh giá và minh chứng
+
+Bảng dưới đây liên kết từng tiêu chí với phần cần mở khi thuyết trình. Hãy chụp ảnh màn hình sau khi chạy hệ thống và lưu vào `docs/evidence/` trong repository. Không chụp hoặc đưa `.env`, mật khẩu, cookie hay token vào ảnh.
+
+| Tiêu chí | Nội dung cần trình bày | Minh chứng nên mở |
+|---|---|---|
+| 1. Quản lý mã nguồn trên GitHub | Repository có source, cấu hình, README; các commit chia theo tính năng. | Trang repository, README, lịch sử commit. Chạy `git log --oneline` để giải thích các commit. |
+| 2. Ứng dụng + database + công cụ quản lý DB | Tạo/đăng nhập tài khoản, tạo phòng, tham gia bằng ID và gửi tin nhắn; PostgreSQL lưu dữ liệu; pgAdmin xem được database. | Website sau khi gửi tin nhắn; pgAdmin mở `internal_chat → Schemas → public → Tables` và các bảng `users`, `rooms`, `room_members`, `messages`. |
+| 3. Nginx reverse proxy | Truy cập website qua Nginx và chỉ ra các security headers. Bản hiện tại dùng HTTP local, chưa cấu hình HTTPS. | Trình duyệt tại `http://localhost/`; kết quả `curl.exe -I http://localhost/`; file `nginx/default.conf`. |
+| 4. Prometheus + Grafana | Dashboard có metrics container, ứng dụng/web và PostgreSQL; truy vấn xác nhận target. | Dashboard **Chat Messaging - Monitoring**; Grafana Explore với PromQL `up` và `pg_up`. `pg_up = 1` là bằng chứng exporter truy cập được PostgreSQL. |
+| 5. Loki + Promtail | Log được gửi tập trung và truy vấn bằng ít nhất 2–3 câu LogQL. | Grafana Explore chọn Loki, lần lượt chạy ba truy vấn ở mục 8; nếu chưa có log mới, đăng nhập hoặc gửi tin nhắn rồi chạy lại. |
+| 6. Hardening | Giải thích các biện pháp đã cấu hình và nêu giới hạn còn lại. | Mục 10 của README; `Dockerfile` cho user non-root; `docker-compose.yml` cho network/capabilities/read-only; `nginx/default.conf` cho headers và rate limit; `.gitignore` để chứng minh `.env` không được commit. |
+| 7. Tổng thể, trình bày và demo | Khởi động được bằng Docker Compose, trình bày luồng hoạt động, có ảnh minh chứng và giải thích được các thành phần. | Chạy `docker compose ps`; lần lượt mở website, pgAdmin, Nginx headers, Grafana và LogQL theo kịch bản ở mục 13. |
+
+Các ảnh nên chuẩn bị: `01-compose-status.png`, `02-chat-message.png`, `03-pgadmin-tables.png`, `04-nginx-headers.png`, `05-grafana-dashboard.png`, `06-prometheus-up-pgup.png`, `07-loki-logql.png` và `08-hardening.png`. Chỉ ghi nhận đúng kết quả thực tế; không dùng ảnh minh họa thay cho dịch vụ chưa chạy.
+
+## 13. Kịch bản demo nhanh trước giảng viên
+
+### Chuẩn bị trước giờ demo
+
+Mở Docker Desktop, mở PowerShell tại thư mục repository và chạy:
+
+```powershell
+docker compose up -d --build
+docker compose --profile admin up -d pgadmin
+docker compose ps
+```
+
+Chờ database báo `healthy` và các dịch vụ ở trạng thái `Up`. Nếu vừa tạo `.env` hoặc đổi cấu hình, kiểm tra các giá trị cần thiết trước giờ trình bày; tuyệt đối không chiếu nội dung bí mật của file này.
+
+### Trình tự trình bày
+
+1. **Giới thiệu mã nguồn:** mở repository GitHub, README và `git log --oneline`; nói ngắn gọn mỗi nhóm commit bổ sung thành phần nào.
+2. **Demo ứng dụng:** mở `http://localhost/`, đăng nhập hoặc tạo hai tài khoản, tạo phòng ở tài khoản thứ nhất, dùng ID phòng cho tài khoản thứ hai, rồi gửi tin nhắn giữa hai phía.
+3. **Chứng minh database:** mở `http://localhost/pgadmin/`, đăng nhập bằng thông tin `PGADMIN_DEFAULT_EMAIL` và `PGADMIN_DEFAULT_PASSWORD` trong `.env`, kết nối server bằng host `db`, rồi mở các bảng trong `internal_chat`. Nếu cần chứng minh dữ liệu, dùng **View/Edit Data → All Rows** trên bảng `messages` hoặc `rooms`.
+4. **Chứng minh Nginx:** chạy `curl.exe -I http://localhost/`; chỉ ra mã phản hồi và các header `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`. Nêu rõ demo local hiện dùng HTTP, chưa có HTTPS.
+5. **Chứng minh giám sát:** mở `http://localhost/grafana/`, vào dashboard **Chat Messaging - Monitoring**, sau đó vào Explore chọn Prometheus và chạy `up`, `pg_up`.
+6. **Chứng minh log tập trung:** trong Explore chọn Loki, chạy các truy vấn JSON, GET và POST ở mục 8. Tạo một request trên website để có log mới nếu cần.
+7. **Giải thích hardening:** mở `Dockerfile`, `docker-compose.yml`, `nginx/default.conf` và mục 10; chạy lệnh sau để cho thấy tiến trình ứng dụng không chạy bằng root:
+
+```powershell
+docker compose exec app id
+```
+
+Kết quả mong đợi có `uid=1000(node)`. Nêu thêm các network nội bộ, PostgreSQL không publish cổng host, `.env` bị loại khỏi Git và security headers. Đồng thời nói rõ các giới hạn đã nêu ở mục 10, đặc biệt cAdvisor cần quyền cao và database chưa tách role riêng cho app/exporter.
+
+### Thu dọn sau demo
+
+```powershell
+docker compose down
+```
+
+Lệnh này dừng và xóa container nhưng giữ dữ liệu trong named volumes. Tránh `docker compose down -v` nếu cần giữ tài khoản, tin nhắn và dữ liệu dashboard cho lần trình bày tiếp theo.
