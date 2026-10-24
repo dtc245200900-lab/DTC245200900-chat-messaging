@@ -1,0 +1,24 @@
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(60);
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description VARCHAR(240) NOT NULL DEFAULT '';
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_public BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS contacts (
+  owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  contact_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (owner_id, contact_id),
+  CHECK (owner_id <> contact_id)
+);
+
+CREATE TABLE IF NOT EXISTS files (
+  id BIGSERIAL PRIMARY KEY,
+  room_id BIGINT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  uploaded_by BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  file_name VARCHAR(255) NOT NULL,
+  content_type VARCHAR(120) NOT NULL,
+  content BYTEA NOT NULL CHECK (octet_length(content) BETWEEN 1 AND 5242880),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_contact ON contacts(contact_id);
+CREATE INDEX IF NOT EXISTS idx_files_room_created ON files(room_id, created_at DESC);

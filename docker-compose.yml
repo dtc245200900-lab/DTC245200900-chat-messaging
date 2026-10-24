@@ -3,15 +3,28 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD in .env}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:?Set POSTGRES_APP_USER in .env}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set a separate POSTGRES_APP_PASSWORD in .env}
+      POSTGRES_EXPORTER_USER: ${POSTGRES_EXPORTER_USER:-chat_exporter}
+      POSTGRES_EXPORTER_PASSWORD: ${POSTGRES_EXPORTER_PASSWORD:?Set POSTGRES_EXPORTER_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./db/init-runtime.sh:/docker-entrypoint-initdb.d/000-runtime.sh:ro
+      - ./db/init-runtime.sql:/opt/init-runtime.sql:ro
       - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
     networks: [backend]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U chat_app -d internal_chat"]
+      test: [CMD-SHELL, "pg_isready -U ${POSTGRES_APP_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,12 +32,15 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      COOKIE_SECURE: "false"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET in .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      POSTGRES_USER: ${POSTGRES_APP_USER:?Set POSTGRES_APP_USER in .env}
+      POSTGRES_EXPORTER_USER: ${POSTGRES_EXPORTER_USER:-chat_exporter}
+      POSTGRES_EXPORTER_PASSWORD: ${POSTGRES_EXPORTER_PASSWORD:?Set a separate random POSTGRES_EXPORTER_PASSWORD in .env}
     depends_on:
       db: {condition: service_healthy}
-    networks: [backend, edge]
+    networks: [backend]
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
@@ -34,33 +50,55 @@ services:
     ports: ["80:80"]
     volumes: [./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro]
     depends_on: [app]
-    networks: [edge, observability]
+    networks: [backend, edge, observability]
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, NET_BIND_SERVICE, SETGID, SETUID]
   pgadmin:
     image: dpage/pgadmin4:8
     ports: ["127.0.0.1:5050:80"]
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL in .env}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set a strong PGADMIN_DEFAULT_PASSWORD in .env}
     volumes: [pgadmin_data:/var/lib/pgadmin]
-    networks: [backend, edge]
+    networks: [backend]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/log/pgadmin
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
     profiles: [admin]
   prometheus:
     image: prom/prometheus:v2.55.1
+    ports: ["127.0.0.1:9090:9090"]
     volumes: [./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro, prometheus_data:/prometheus]
-    networks: [backend, observability]
+    networks: [observability, prometheus_host]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     environment:
       DATA_SOURCE_URI: db:5432/${POSTGRES_DB}?sslmode=disable
-      DATA_SOURCE_USER: ${POSTGRES_USER}
-      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      DATA_SOURCE_USER: ${POSTGRES_EXPORTER_USER:-chat_exporter}
+      DATA_SOURCE_PASS: ${POSTGRES_EXPORTER_PASSWORD:?Set a separate random POSTGRES_EXPORTER_PASSWORD in .env}
     depends_on:
       db: {condition: service_healthy}
     networks: [backend, observability]
     restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   cadvisor:
     image: ghcr.io/google/cadvisor:v0.60.6
-    privileged: true
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -69,10 +107,29 @@ services:
       - /dev/disk:/dev/disk:ro
     networks: [observability]
     restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      INFO: "1"
+      VERSION: "1"
+      POST: "0"
+      LOG_LEVEL: warning
+    volumes: [/var/run/docker.sock:/var/run/docker.sock:ro]
+    networks: [observability]
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
   grafana:
     image: grafana/grafana:11.3.0
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set a strong GRAFANA_ADMIN_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
@@ -81,21 +138,37 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     networks: [observability, edge]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/log/grafana
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   loki:
     image: grafana/loki:3.3.2
     command: ["-config.file=/etc/loki/local-config.yaml"]
     volumes: [./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro, loki_data:/loki]
     networks: [observability]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   promtail:
     image: grafana/promtail:3.3.2
     command: ["-config.file=/etc/promtail/config.yml"]
-    volumes: [./loki/promtail-config.yml:/etc/promtail/config.yml:ro, /var/run/docker.sock:/var/run/docker.sock:ro]
+    volumes: [./loki/promtail-config.yml:/etc/promtail/config.yml:ro]
     networks: [observability]
-    depends_on: [loki]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on: [loki, docker-socket-proxy]
 networks:
   backend: {internal: true}
   edge: {}
   observability: {internal: true}
+  prometheus_host: {}
 volumes:
   postgres_data:
   pgadmin_data:
