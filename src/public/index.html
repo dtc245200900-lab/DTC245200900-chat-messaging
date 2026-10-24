@@ -280,7 +280,12 @@
               <label for="currentPassword">Mật khẩu hiện tại</label>
               <input id="currentPassword" type="password" autocomplete="current-password" required>
               <label for="newPassword">Mật khẩu mới</label>
-              <input id="newPassword" type="password" minlength="10" maxlength="128" autocomplete="new-password" required>
+              <input id="newPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required aria-describedby="newPasswordHint newPasswordStatus">
+              <small id="newPasswordHint" class="password-hint">Ít nhất 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.</small>
+              <small id="newPasswordStatus" class="password-status" aria-live="polite"></small>
+              <label for="confirmNewPassword">Xác nhận mật khẩu mới</label>
+              <input id="confirmNewPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" required aria-describedby="confirmPasswordStatus">
+              <small id="confirmPasswordStatus" class="password-status" aria-live="polite"></small>
               <button class="primary-button" type="submit">Cập nhật mật khẩu</button>
             </form>
           </div>

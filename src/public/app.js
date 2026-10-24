@@ -1678,20 +1678,67 @@ $('#profileForm').addEventListener('submit', async (event) => {
 $('#passwordForm').addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
+  const newPassword = $('#newPassword').value;
+  const confirmPassword = $('#confirmNewPassword').value;
+  if (!isStrongPassword(newPassword)) {
+    $('#newPassword').focus();
+    updatePasswordFeedback();
+    notify('Mật khẩu mới phải có ít nhất 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    $('#confirmNewPassword').focus();
+    updatePasswordFeedback();
+    notify('Mật khẩu xác nhận không khớp.');
+    return;
+  }
   try {
     await api('/api/me/password', {
       method: 'POST',
       body: JSON.stringify({
         current_password: $('#currentPassword').value,
-        new_password: $('#newPassword').value,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
       }),
     });
     form.reset();
+    updatePasswordFeedback();
     notify('Mật khẩu đã được cập nhật.', 'success');
   } catch (error) {
     notify(error.message);
   }
 });
+
+function isStrongPassword(password) {
+  return password.length >= 12
+    && password.length <= 128
+    && /\p{Lu}/u.test(password)
+    && /\p{Ll}/u.test(password)
+    && /\p{N}/u.test(password)
+    && /[^\p{L}\p{N}\s]/u.test(password);
+}
+
+function updatePasswordFeedback() {
+  const newPassword = $('#newPassword').value;
+  const confirmPassword = $('#confirmNewPassword').value;
+  const strengthStatus = $('#newPasswordStatus');
+  const confirmationStatus = $('#confirmPasswordStatus');
+  strengthStatus.textContent = newPassword
+    ? (isStrongPassword(newPassword)
+      ? 'Mật khẩu đáp ứng yêu cầu.'
+      : 'Mật khẩu chưa đáp ứng đủ các yêu cầu.')
+    : '';
+  strengthStatus.classList.toggle('valid', Boolean(newPassword) && isStrongPassword(newPassword));
+  strengthStatus.classList.toggle('invalid', Boolean(newPassword) && !isStrongPassword(newPassword));
+  confirmationStatus.textContent = confirmPassword
+    ? (newPassword === confirmPassword ? 'Mật khẩu xác nhận khớp.' : 'Mật khẩu xác nhận chưa khớp.')
+    : '';
+  confirmationStatus.classList.toggle('valid', Boolean(confirmPassword) && newPassword === confirmPassword);
+  confirmationStatus.classList.toggle('invalid', Boolean(confirmPassword) && newPassword !== confirmPassword);
+}
+
+$('#newPassword').addEventListener('input', updatePasswordFeedback);
+$('#confirmNewPassword').addEventListener('input', updatePasswordFeedback);
 
 $('#logout').addEventListener('click', async () => {
   try {

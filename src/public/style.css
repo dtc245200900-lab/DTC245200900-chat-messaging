@@ -145,6 +145,10 @@ tbody tr:last-child td{border-bottom:0}
 .settings-card input{width:100%;height:39px;padding:0 11px;border:1px solid #dfe5ee;border-radius:8px;background:#fff;color:var(--ink);font-size:12px}
 .settings-card input[readonly]{background:#f6f8fc;color:#8995a7}
 .settings-card .primary-button{height:39px;margin-top:8px;font-size:11px}
+.password-hint,.password-status{color:#8290a4;font-size:10px;line-height:1.45}
+.password-status:empty{display:none}
+.password-status.valid{color:#18794e}
+.password-status.invalid{color:#b42318}
 button:disabled{cursor:wait;opacity:.65}
 @media(max-width:1100px){.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.upload-card{grid-template-columns:120px minmax(140px,1fr);}.upload-card .primary-button{grid-column:2}}
 @media(max-width:900px){.workspace{height:auto;min-height:calc(100vh - 120px);grid-template-columns:62px minmax(0,1fr);gap:10px}.main-stage{min-height:680px}.chat-view{height:auto;min-height:680px;grid-template-columns:240px minmax(0,1fr);gap:10px}.room-sidebar{max-height:760px}.conversation-panel{height:680px}.page-view{min-height:680px}.card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.upload-card{grid-template-columns:1fr 2fr}.upload-card .primary-button{grid-column:auto}}

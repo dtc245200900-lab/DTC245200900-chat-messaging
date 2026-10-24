@@ -318,8 +318,20 @@ app.get('/api/users/:id/avatar', auth, wrap(async (request, response) => {
 app.post('/api/me/password', auth, wrap(async (request, response) => {
   const currentPassword = String(request.body.current_password || '');
   const newPassword = String(request.body.new_password || '');
-  if (newPassword.length < 10 || newPassword.length > 128) {
-    return response.status(400).json({ error: 'New password must be 10-128 characters' });
+  const confirmPassword = String(request.body.confirm_password || '');
+  const isStrongPassword = newPassword.length >= 12
+    && newPassword.length <= 128
+    && /\p{Lu}/u.test(newPassword)
+    && /\p{Ll}/u.test(newPassword)
+    && /\p{N}/u.test(newPassword)
+    && /[^\p{L}\p{N}\s]/u.test(newPassword);
+  if (!isStrongPassword) {
+    return response.status(400).json({
+      error: 'Mật khẩu mới phải có 12-128 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.',
+    });
+  }
+  if (newPassword !== confirmPassword) {
+    return response.status(400).json({ error: 'Mật khẩu xác nhận không khớp.' });
   }
   const { rows } = await pool.query('SELECT password_hash FROM users WHERE id=$1', [request.user.sub]);
   if (!rows[0] || !await bcrypt.compare(currentPassword, rows[0].password_hash)) {
